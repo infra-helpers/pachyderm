@@ -1,11 +1,13 @@
 package client
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"time"
 
+	"github.com/pachyderm/pachyderm/v2/src/internal/clientsdk"
 	"github.com/pachyderm/pachyderm/v2/src/internal/errors"
 	"github.com/pachyderm/pachyderm/v2/src/internal/errutil"
 	"github.com/pachyderm/pachyderm/v2/src/internal/grpcutil"
@@ -233,11 +235,13 @@ func (c APIClient) WaitJob(pipelineName string, jobID string, full bool) (_ *pps
 }
 
 func (c APIClient) inspectJobset(id string, wait bool, cb func(*pps.JobInfo) error) (retErr error) {
+	ctx, cf := context.WithCancel(c.Ctx())
+	defer cf()
 	req := &pps.InspectJobsetRequest{
 		Jobset: NewJobset(id),
 		Wait:   wait,
 	}
-	client, err := c.PpsAPIClient.InspectJobset(c.Ctx(), req)
+	client, err := c.PpsAPIClient.InspectJobset(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -342,8 +346,10 @@ func (c APIClient) ListJobFilterF(pipelineName string, inputCommit []*pfs.Commit
 	if pipelineName != "" {
 		pipeline = NewPipeline(pipelineName)
 	}
+	ctx, cf := context.WithCancel(c.Ctx())
+	defer cf()
 	client, err := c.PpsAPIClient.ListJob(
-		c.Ctx(),
+		ctx,
 		&pps.ListJobRequest{
 			Pipeline:    pipeline,
 			InputCommit: inputCommit,
@@ -373,8 +379,10 @@ func (c APIClient) ListJobFilterF(pipelineName string, inputCommit []*pfs.Commit
 // SubscribeJob calls the given callback with each open job in the given
 // pipeline until canceled.
 func (c APIClient) SubscribeJob(pipelineName string, full bool, cb func(*pps.JobInfo) error) error {
+	ctx, cf := context.WithCancel(c.Ctx())
+	defer cf()
 	client, err := c.PpsAPIClient.SubscribeJob(
-		c.Ctx(),
+		ctx,
 		&pps.SubscribeJobRequest{
 			Pipeline: NewPipeline(pipelineName),
 			Full:     full,
@@ -489,10 +497,9 @@ func (c APIClient) ListDatumInputAll(input *pps.Input) (_ []*pps.DatumInfo, retE
 }
 
 func (c APIClient) listDatum(req *pps.ListDatumRequest, cb func(*pps.DatumInfo) error) (retErr error) {
-	client, err := c.PpsAPIClient.ListDatum(
-		c.Ctx(),
-		req,
-	)
+	ctx, cf := context.WithCancel(c.Ctx())
+	defer cf()
+	client, err := c.PpsAPIClient.ListDatum(ctx, req)
 	if err != nil {
 		return err
 	}
@@ -690,14 +697,16 @@ func (c APIClient) InspectPipeline(pipelineName string) (*pps.PipelineInfo, erro
 
 // ListPipeline returns info about all pipelines.
 func (c APIClient) ListPipeline() ([]*pps.PipelineInfo, error) {
-	pipelineInfos, err := c.PpsAPIClient.ListPipeline(
-		c.Ctx(),
+	ctx, cf := context.WithCancel(c.Ctx())
+	defer cf()
+	client, err := c.PpsAPIClient.ListPipeline(
+		ctx,
 		&pps.ListPipelineRequest{},
 	)
 	if err != nil {
 		return nil, grpcutil.ScrubGRPC(err)
 	}
-	return pipelineInfos.PipelineInfo, nil
+	return clientsdk.ListPipelineInfo(client)
 }
 
 // ListPipelineHistory returns historical information about pipelines.
@@ -709,13 +718,15 @@ func (c APIClient) ListPipeline() ([]*pps.PipelineInfo, error) {
 // 1: Return the above and the next most recent version
 // 2: etc.
 //-1: Return all historical versions.
-func (c APIClient) ListPipelineHistory(pipeline string, history int64) ([]*pps.PipelineInfo, error) {
+func (c APIClient) ListPipelineHistory(pipeline string, history int64) (_ []*pps.PipelineInfo, retErr error) {
 	var _pipeline *pps.Pipeline
 	if pipeline != "" {
 		_pipeline = NewPipeline(pipeline)
 	}
-	pipelineInfos, err := c.PpsAPIClient.ListPipeline(
-		c.Ctx(),
+	ctx, cf := context.WithCancel(c.Ctx())
+	defer cf()
+	client, err := c.PpsAPIClient.ListPipeline(
+		ctx,
 		&pps.ListPipelineRequest{
 			Pipeline: _pipeline,
 			History:  history,
@@ -724,7 +735,7 @@ func (c APIClient) ListPipelineHistory(pipeline string, history int64) ([]*pps.P
 	if err != nil {
 		return nil, grpcutil.ScrubGRPC(err)
 	}
-	return pipelineInfos.PipelineInfo, nil
+	return clientsdk.ListPipelineInfo(client)
 }
 
 // DeletePipeline deletes a pipeline along with its output Repo.
