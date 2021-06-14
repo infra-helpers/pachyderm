@@ -269,7 +269,7 @@ func (env *NonblockingServiceEnv) initKubeClient() error {
 func (env *NonblockingServiceEnv) initDBClient() error {
 	return backoff.Retry(func() error {
 		db, err := dbutil.NewDB(
-			dbutil.WithHostPort(env.config.PostgresServiceHost, env.config.PostgresServicePort),
+			dbutil.WithHostPort(env.config.PostgresHost, env.config.PostgresPort),
 			dbutil.WithDBName(env.config.PostgresDBName),
 		)
 		if err != nil {
@@ -282,7 +282,7 @@ func (env *NonblockingServiceEnv) initDBClient() error {
 
 func (env *NonblockingServiceEnv) initListener() error {
 	dsn := dbutil.GetDSN(
-		dbutil.WithHostPort(env.config.PostgresServiceHost, env.config.PostgresServicePort),
+		dbutil.WithHostPort(env.config.PostgresHost, env.config.PostgresPort),
 		dbutil.WithDBName(env.config.PostgresDBName),
 	)
 	return backoff.Retry(func() error {
