@@ -2543,6 +2543,8 @@ func (a *apiServer) DeletePipeline(ctx context.Context, request *pps.DeletePipel
 }
 
 func (a *apiServer) deletePipeline(ctx context.Context, request *pps.DeletePipelineRequest) error {
+	pachClient := a.env.GetPachClient(ctx)
+
 	// Check if there's a PipelineInfo for this pipeline. If not, we can't
 	// authorize, and must return something here
 	pipelineInfo := &pps.PipelineInfo{}
@@ -2553,18 +2555,18 @@ func (a *apiServer) deletePipeline(ctx context.Context, request *pps.DeletePipel
 		return err
 	}
 
-	// Load pipeline details so we can do some cleanup tasks based on certain
-	// input types and the output branch.
-	pachClient := a.env.GetPachClient(ctx)
-	if err := ppsutil.GetPipelineDetails(pachClient, pipelineInfo); err != nil {
-		return err
-	}
-
 	// check if the output repo exists--if not, the pipeline is non-functional and
 	// the rest of the delete operation continues without any auth checks
 	if _, err := pachClient.InspectRepo(request.Pipeline.Name); err != nil && !errutil.IsNotFoundError(err) && !auth.IsErrNoRoleBinding(err) {
 		return err
 	} else if err == nil {
+		// If the pipeline exists, we should be able to load the pipeline details so
+		// we can do some cleanup tasks based on certain input types and the output
+		// branch.
+		if err := ppsutil.GetPipelineDetails(pachClient, pipelineInfo); err != nil {
+			return err
+		}
+
 		// Check if the caller is authorized to delete this pipeline
 		if err := a.authorizePipelineOp(ctx, pipelineOpDelete, pipelineInfo.Details.Input, pipelineInfo.Pipeline.Name); err != nil {
 			return err
@@ -2581,6 +2583,16 @@ func (a *apiServer) deletePipeline(ctx context.Context, request *pps.DeletePipel
 				return err
 			}
 		} else {
+			// Delete cron input repos
+			if err := pps.VisitInput(pipelineInfo.Details.Input, func(input *pps.Input) error {
+				if input.Cron != nil {
+					return pachClient.DeleteRepo(input.Cron.Repo, request.Force)
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+
 			// delete the pipeline's output repo
 			if err := pachClient.DeleteRepo(request.Pipeline.Name, request.Force); err != nil {
 				return err
@@ -2608,7 +2620,8 @@ func (a *apiServer) deletePipeline(ctx context.Context, request *pps.DeletePipel
 		}
 	}
 
-	// Delete all of the pipeline's jobs
+	// Delete all of the pipeline's jobs - we shouldn't need to worry about any
+	// new jobs since the output repo has already been deleted or disconnected.
 	var eg errgroup.Group
 	jobInfo := &pps.JobInfo{}
 	if err := a.jobs.ReadOnly(ctx).GetByIndex(ppsdb.JobsPipelineIndex, request.Pipeline.Name, jobInfo, col.DefaultOptions(), func(string) error {
@@ -2628,28 +2641,10 @@ func (a *apiServer) deletePipeline(ctx context.Context, request *pps.DeletePipel
 		return err
 	}
 
-	eg = errgroup.Group{}
-	// Delete cron input repos
-	if !request.KeepRepo {
-		pps.VisitInput(pipelineInfo.Details.Input, func(input *pps.Input) error {
-			if input.Cron != nil {
-				eg.Go(func() error {
-					return pachClient.DeleteRepo(input.Cron.Repo, request.Force)
-				})
-			}
-			return nil
-		})
-	}
-	// Delete PipelineInfo
-	eg.Go(func() error {
-		if err := col.NewSQLTx(ctx, a.env.GetDBClient(), func(sqlTx *sqlx.Tx) error {
-			return a.pipelines.ReadWrite(sqlTx).Delete(request.Pipeline.Name)
-		}); err != nil {
-			return errors.Wrapf(err, "collection.Delete")
-		}
-		return nil
+	// Delete the PipelineInfo from the database
+	return col.NewSQLTx(ctx, a.env.GetDBClient(), func(sqlTx *sqlx.Tx) error {
+		return a.pipelines.ReadWrite(sqlTx).Delete(request.Pipeline.Name)
 	})
-	return eg.Wait()
 }
 
 // StartPipeline implements the protobuf pps.StartPipeline RPC
