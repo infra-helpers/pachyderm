@@ -17,7 +17,7 @@ import (
 // takes a context as the first parameter for each method.
 type Client interface {
 	WithModifyFileClient(ctx context.Context, commit *pfs.Commit, cb func(client.ModifyFile) error) error
-	GetFileTar(ctx context.Context, commit *pfs.Commit, path string) (io.Reader, error)
+	GetFileTAR(ctx context.Context, commit *pfs.Commit, path string) (io.Reader, error)
 }
 
 type pachClient struct {
@@ -32,8 +32,8 @@ func (pc *pachClient) WithModifyFileClient(ctx context.Context, commit *pfs.Comm
 	return pc.client.WithCtx(ctx).WithModifyFileClient(commit, cb)
 }
 
-func (pc *pachClient) GetFileTar(ctx context.Context, commit *pfs.Commit, path string) (io.Reader, error) {
-	return pc.client.WithCtx(ctx).GetFileTar(commit, path)
+func (pc *pachClient) GetFileTAR(ctx context.Context, commit *pfs.Commit, path string) (io.Reader, error) {
+	return pc.client.WithCtx(ctx).GetFileTAR(commit, path)
 }
 
 type ThroughputSpec struct {
