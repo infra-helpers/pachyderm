@@ -629,6 +629,14 @@ func PachdDeployment(opts *AssetOpts, objectStoreBackend Backend, hostPath strin
 			Name:  client.PPSWorkerPortEnv,
 			Value: "80",
 		},
+		{
+			Name:  "PG_HOST",
+			Value: "postgres.default.svc.cluster.local", // PG_HOST may be override for an external postgres deployment
+		},
+		{
+			Name:  "PG_PORT",
+			Value: "5432",
+		},
 	}
 	envVars = append(envVars, GetSecretEnvVars("")...)
 	envVars = append(envVars, getStorageEnvVars(opts)...)
