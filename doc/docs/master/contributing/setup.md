@@ -102,6 +102,19 @@ For `pachyderm/python-build` container:
 (cd etc/pipeline-build; make push-to-minikube)
 ```
 
+## Deploy Docker images
+* Build the Docker images:
+```
+DOCKER_BUILDKIT=1 docker build --build-arg GO_VERSION=1.15.7 -t infrahelpers/pachctl:1.13.2 -f Dockerfile.pachctl .
+DOCKER_BUILDKIT=1 docker build --build-arg GO_VERSION=1.15.7 -t infrahelpers/pachd:1.13.2 -f Dockerfile.pachd .
+```
+
+* Upload the Docker images to Docker Hub:
+```
+docker push infrahelpers/pachctl:1.13.2
+docker push infrahelpers/pachd:1.13.2
+```
+
 ## Running tests
 
 Now that we have a dev cluster, it's nice to be able to run some tests locally
