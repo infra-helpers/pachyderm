@@ -28,7 +28,6 @@ import (
 	"github.com/pachyderm/pachyderm/src/client/pkg/tracing"
 	"github.com/pachyderm/pachyderm/src/client/pkg/tracing/extended"
 	"github.com/pachyderm/pachyderm/src/client/pps"
-	enterpriselimits "github.com/pachyderm/pachyderm/src/server/enterprise/limits"
 	enterprisemetrics "github.com/pachyderm/pachyderm/src/server/enterprise/metrics"
 	enterprisetext "github.com/pachyderm/pachyderm/src/server/enterprise/text"
 	pfsServer "github.com/pachyderm/pachyderm/src/server/pfs"
@@ -1922,21 +1921,21 @@ func (a *apiServer) validateEnterpriseChecks(ctx context.Context, pipelineInfo *
 		return nil
 	}
 
-	if pipelineInfo.ParallelismSpec != nil && pipelineInfo.ParallelismSpec.Constant > enterpriselimits.Parallelism {
-		enterprisemetrics.IncEnterpriseFailures()
-		return errors.Errorf("%s requires an activation key to create pipelines with parallelism more than %d. %s\n\n%s",
-			enterprisetext.OpenSourceProduct, enterpriselimits.Parallelism, enterprisetext.ActivateCTA, enterprisetext.RegisterCTA)
-	}
+	//if pipelineInfo.ParallelismSpec != nil && pipelineInfo.ParallelismSpec.Constant > enterpriselimits.Parallelism {
+	//	enterprisemetrics.IncEnterpriseFailures()
+	//	return errors.Errorf("%s requires an activation key to create pipelines with parallelism more than %d. %s\n\n%s",
+	//		enterprisetext.OpenSourceProduct, enterpriselimits.Parallelism, enterprisetext.ActivateCTA, enterprisetext.RegisterCTA)
+	//}
 
-	pipelines, err := a.pipelines.ReadOnly(ctx).Count()
-	if err != nil {
-		return err
-	}
-	if pipelines >= enterpriselimits.Pipelines {
-		enterprisemetrics.IncEnterpriseFailures()
-		return errors.Errorf("%s requires an activation key to create more than %d total pipelines (you have %d). %s\n\n%s",
-			enterprisetext.OpenSourceProduct, enterpriselimits.Pipelines, pipelines, enterprisetext.ActivateCTA, enterprisetext.RegisterCTA)
-	}
+	//pipelines, err := a.pipelines.ReadOnly(ctx).Count()
+	//if err != nil {
+	//	return err
+	//}
+	//if pipelines >= enterpriselimits.Pipelines {
+	//	enterprisemetrics.IncEnterpriseFailures()
+	//	return errors.Errorf("%s requires an activation key to create more than %d total pipelines (you have %d). %s\n\n%s",
+	//		enterprisetext.OpenSourceProduct, enterpriselimits.Pipelines, pipelines, enterprisetext.ActivateCTA, enterprisetext.RegisterCTA)
+	//}
 	return nil
 }
 
